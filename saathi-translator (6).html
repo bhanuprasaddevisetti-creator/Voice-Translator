@@ -498,11 +498,19 @@ async function translateBatch(phrases, fromLangCode, toLangCode){
 }
 
 /* ============ TEXT TO SPEECH ============
-   Primary: fetch a real human-sounding cloud voice (same voice used on
-   Google Translate's own website) -- no phone settings or voice-pack
-   installation needed, just an internet connection.
-   Fallback: the phone's built-in voice, only if the cloud call fails
-   (e.g. no internet) so the app still says something. */
+   Primary: Sarvam AI's Text-to-Speech API (Bulbul v3) -- built specifically
+   for Indian languages including Telugu, with a real free tier and no
+   credit card required. Sounds natural and works from any hosted page.
+   Fallback: the phone's built-in voice, only if the API call fails
+   (e.g. no internet, or the free quota runs out) so the app still says
+   something rather than nothing.
+
+   Note: this key is visible to anyone who views this page's source, since
+   it runs entirely in the browser. That's an acceptable trade-off for a
+   small community tool; for larger-scale use, route this call through a
+   small server instead so the key isn't public. */
+const SARVAM_API_KEY = "sk_cpiveb45_6J1vMH1OTbyJXp6pDaCCWaxg";
+const SARVAM_SPEAKER = "shubh";
 
 let availableVoices = [];
 function loadVoices(){ availableVoices = window.speechSynthesis.getVoices(); }
@@ -526,13 +534,11 @@ function speakWithDeviceVoice(text, langCode){
   if(voice){ u.voice = voice; u.lang = voice.lang; } else { u.lang = langCode; }
   u.rate = 0.82;
   window.speechSynthesis.speak(u);
-  statusPill.textContent = voice
-    ? ""
-    : "⚠ Using this phone's built-in voice — it may sound unclear for " + langName(langCode) + ".";
+  statusPill.textContent = "⚠ Using a backup voice for " + langName(langCode) + " — the main voice service didn't respond.";
 }
 
-// Google's spoken-audio endpoint caps out around 200 characters per request,
-// so long phrases are split on word boundaries and played back to back.
+// Sarvam's v3 API accepts up to 2500 characters per request, so long
+// phrases are split on word boundaries just as a safety margin.
 function splitForSpeech(text, maxLen){
   const words = text.split(" ");
   const chunks = [];
@@ -545,20 +551,43 @@ function splitForSpeech(text, maxLen){
   return chunks;
 }
 
-function playCloudChunks(chunks, iso, langCode, idx){
+async function sarvamSpeak(text, langCode){
+  const res = await fetch("https://api.sarvam.ai/text-to-speech", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "api-subscription-key": SARVAM_API_KEY
+    },
+    body: JSON.stringify({
+      text: text,
+      language_code: langCode,
+      model: "bulbul:v3",
+      speaker: SARVAM_SPEAKER
+    })
+  });
+  if(!res.ok) throw new Error("Sarvam TTS status " + res.status);
+  const data = await res.json();
+  const b64 = data.audios && data.audios[0];
+  if(!b64) throw new Error("Sarvam TTS returned no audio");
+  return "data:audio/wav;base64," + b64;
+}
+
+function playCloudChunks(chunks, langCode, idx){
   if(idx >= chunks.length) return;
-  const url = "https://translate.google.com/translate_tts?ie=UTF-8&tl=" + iso +
-              "&client=tw-ob&q=" + encodeURIComponent(chunks[idx]);
-  const audio = new Audio(url);
-  audio.onended = ()=> playCloudChunks(chunks, iso, langCode, idx + 1);
-  audio.onerror = ()=> speakWithDeviceVoice(chunks.slice(idx).join(" "), langCode);
-  audio.play().catch(()=> speakWithDeviceVoice(chunks.slice(idx).join(" "), langCode));
+  sarvamSpeak(chunks[idx], langCode).then(dataUrl=>{
+    const audio = new Audio(dataUrl);
+    audio.onended = ()=> playCloudChunks(chunks, langCode, idx + 1);
+    audio.play().catch(()=> speakWithDeviceVoice(chunks.slice(idx).join(" "), langCode));
+  }).catch(e=>{
+    console.error("Sarvam TTS failed:", e);
+    speakWithDeviceVoice(chunks.slice(idx).join(" "), langCode);
+  });
 }
 
 function speak(text, langCode){
   statusPill.textContent = "";
-  const chunks = splitForSpeech(text, 180);
-  playCloudChunks(chunks, isoOf(langCode), langCode, 0);
+  const chunks = splitForSpeech(text, 2000);
+  playCloudChunks(chunks, langCode, 0);
 }
 
 /* ============ SPEECH TO TEXT ============
