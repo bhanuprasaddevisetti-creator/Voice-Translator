@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Saathi — Voice Translator</title>
+<style>
+  :root{
+    --ink:#1B1B18;
+    --panel:#26251F;
+    --panel-2:#302E26;
+    --amber:#F2A900;
+    --amber-deep:#C68600;
+    --steel:#3E6E8E;
+    --steel-light:#5E93B5;
+    --signal:#D64545;
+    --signal-deep:#A83636;
+    --paper:#F4EFE3;
+    --slate:#9C9A8C;
+    --border:#45443A;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;background:var(--ink);}
+  body{
+    font-family:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    color:var(--paper);
+    display:flex;
+    justify-content:center;
+  }
+  #app{
+    width:100%;
+    max-width:480px;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    background:var(--ink);
+  }
+
+  /* ===== Top language bar ===== */
+  .langbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px 16px;
+    background:var(--panel);
+    border-bottom:3px solid var(--border);
+    gap:8px;
+  }
+  .langbar select{
+    flex:1;
+    background:var(--panel-2);
+    color:var(--paper);
+    border:2px solid var(--border);
+    padding:10px 8px;
+    font-size:15px;
+    font-weight:700;
+    border-radius:4px;
+  }
+  .swap-btn{
+    background:var(--amber);
+    color:var(--ink);
+    border:none;
+    width:42px;
+    height:42px;
+    border-radius:50%;
+    font-size:20px;
+    font-weight:900;
+    flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .swap-btn:active{background:var(--amber-deep);}
+
+  /* ===== Screens ===== */
+  .screen{
+    flex:1;
+    display:none;
+    flex-direction:column;
+    padding:20px 18px 100px 18px;
+    overflow-y:auto;
+  }
+  .screen.active{display:flex;}
+
+  /* ===== Translate screen ===== */
+  .mic-wrap{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:30px 0 24px 0;
+  }
+  .mic-btn{
+    width:150px;height:150px;
+    border-radius:50%;
+    background:var(--amber);
+    border:6px solid var(--amber-deep);
+    display:flex;align-items:center;justify-content:center;
+    font-size:64px;
+    cursor:pointer;
+    transition:transform .12s ease, background .12s ease;
+    color:var(--ink);
+  }
+  .mic-btn.listening{
+    background:var(--signal);
+    border-color:var(--signal-deep);
+    transform:scale(1.06);
+    animation:pulse 1.1s infinite;
+  }
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(214,69,69,.5);}
+    70%{box-shadow:0 0 0 24px rgba(214,69,69,0);}
+    100%{box-shadow:0 0 0 0 rgba(214,69,69,0);}
+  }
+  .mic-label{
+    margin-top:16px;
+    font-size:20px;
+    font-weight:800;
+    letter-spacing:.2px;
+  }
+  .mic-sub{
+    margin-top:4px;
+    font-size:14px;
+    color:var(--slate);
+  }
+
+  .result-block{
+    border:3px solid var(--border);
+    border-radius:6px;
+    margin-bottom:14px;
+    overflow:hidden;
+  }
+  .result-head{
+    background:var(--panel-2);
+    padding:8px 12px;
+    font-size:13px;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:.6px;
+    color:var(--slate);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .result-head.local{color:var(--steel-light);}
+  .result-body{
+    padding:16px 14px;
+    font-size:20px;
+    font-weight:600;
+    line-height:1.4;
+    min-height:32px;
+  }
+  .result-body.empty{color:var(--slate); font-weight:400; font-size:16px;}
+  .play-btn{
+    background:var(--steel);
+    color:var(--paper);
+    border:none;
+    border-radius:4px;
+    padding:6px 12px;
+    font-size:18px;
+    font-weight:700;
+  }
+  .play-btn:active{background:var(--steel-light);}
+
+  /* ===== Phrasebook ===== */
+  .section-title{
+    font-size:15px;
+    font-weight:800;
+    color:var(--slate);
+    text-transform:uppercase;
+    letter-spacing:.6px;
+    margin:6px 0 14px 0;
+  }
+  .phrase-card{
+    border:3px solid var(--border);
+    border-radius:6px;
+    margin-bottom:12px;
+    padding:14px;
+    background:var(--panel);
+  }
+  .phrase-en{
+    font-size:15px;
+    color:var(--slate);
+    margin-bottom:6px;
+    font-weight:600;
+  }
+  .phrase-local{
+    font-size:20px;
+    font-weight:700;
+    line-height:1.35;
+    min-height:26px;
+  }
+  .phrase-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:10px;
+  }
+  .phrase-speak{
+    background:var(--amber);
+    color:var(--ink);
+    border:none;
+    border-radius:50%;
+    width:44px;height:44px;
+    font-size:20px;
+    flex-shrink:0;
+  }
+  .phrase-speak:active{background:var(--amber-deep);}
+  .loading-note{
+    color:var(--slate);
+    font-size:14px;
+    padding:10px 0;
+  }
+
+  /* ===== SOS ===== */
+  .sos-hero{
+    background:var(--signal);
+    border:4px solid var(--signal-deep);
+    border-radius:8px;
+    padding:26px 18px;
+    text-align:center;
+    margin-bottom:18px;
+  }
+  .sos-hero-label{
+    font-size:15px;
+    font-weight:900;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:#3A0E0E;
+    margin-bottom:10px;
+  }
+  .sos-phrase{
+    font-size:24px;
+    font-weight:800;
+    line-height:1.35;
+    color:#fff;
+  }
+  .sos-speak-btn{
+    margin-top:16px;
+    background:#fff;
+    color:var(--signal-deep);
+    border:none;
+    border-radius:6px;
+    padding:12px 22px;
+    font-size:17px;
+    font-weight:800;
+    width:100%;
+  }
+  .call-row{
+    display:flex;
+    gap:10px;
+    margin-bottom:12px;
+  }
+  .call-btn{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:16px 8px;
+    border-radius:6px;
+    border:3px solid var(--border);
+    background:var(--panel);
+    color:var(--paper);
+    text-decoration:none;
+    font-weight:800;
+  }
+  .call-btn .num{font-size:24px; margin-bottom:4px;}
+  .call-btn .lbl{font-size:12px; color:var(--slate); text-transform:uppercase; letter-spacing:.4px;}
+  .family-box{
+    border:3px dashed var(--border);
+    border-radius:6px;
+    padding:14px;
+    margin-top:6px;
+  }
+  .family-box input{
+    width:100%;
+    background:var(--panel-2);
+    border:2px solid var(--border);
+    color:var(--paper);
+    padding:10px;
+    font-size:16px;
+    border-radius:4px;
+    margin-top:8px;
+  }
+  .family-call{
+    display:block;
+    margin-top:10px;
+    background:var(--steel);
+    color:#fff;
+    text-align:center;
+    padding:12px;
+    border-radius:6px;
+    font-weight:800;
+    text-decoration:none;
+  }
+
+  /* ===== Bottom nav ===== */
+  .navbar{
+    position:fixed;
+    bottom:0;
+    width:100%;
+    max-width:480px;
+    display:flex;
+    background:var(--panel);
+    border-top:3px solid var(--border);
+  }
+  .nav-btn{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:12px 4px 10px 4px;
+    background:none;
+    border:none;
+    color:var(--slate);
+    font-size:12px;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:.3px;
+    gap:4px;
+  }
+  .nav-btn .icon{font-size:24px;}
+  .nav-btn.active{color:var(--amber);}
+  .nav-btn.sos-nav.active{color:var(--signal);}
+
+  .status-pill{
+    font-size:12px;
+    color:var(--slate);
+    text-align:center;
+    margin-top:6px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="langbar">
+    <select id="langA"></select>
+    <button class="swap-btn" id="swapBtn" title="Swap languages">⇄</button>
+    <select id="langB"></select>
+  </div>
+
+  <!-- TRANSLATE SCREEN -->
+  <div class="screen active" id="screen-translate">
+    <div class="mic-wrap">
+      <button class="mic-btn" id="micBtn">🎤</button>
+      <div class="mic-label" id="micLabel">Tap and speak</div>
+      <div class="mic-sub" id="micSub">Speaks your language, hears the reply</div>
+    </div>
+
+    <div class="result-block">
+      <div class="result-head" id="headA">YOU SAID</div>
+      <textarea class="result-body" id="textA" placeholder="Nothing yet — tap the mic, or type here." style="width:100%; border:none; background:transparent; color:var(--paper); resize:vertical; min-height:60px; font-family:inherit;"></textarea>
+    </div>
+
+    <button class="play-btn" id="translateBtn" style="width:100%; padding:14px; font-size:17px; margin-bottom:14px;">Translate ⇄</button>
+
+    <div class="result-block">
+      <div class="result-head local" id="headB">
+        <span>TRANSLATION</span>
+        <button class="play-btn" id="playB" style="display:none;">🔊 Play</button>
+      </div>
+      <div class="result-body empty" id="textB">Translation appears here.</div>
+    </div>
+    <div class="status-pill" id="statusPill">If the recognized text above is wrong, edit it before translating — some languages (like Telugu) are less reliably recognized by the browser's voice input than Hindi or English.</div>
+  </div>
+
+  <!-- PHRASEBOOK SCREEN -->
+  <div class="screen" id="screen-phrases">
+    <div class="section-title">Common Work Phrases</div>
+    <div id="phraseList"></div>
+  </div>
+
+  <!-- SOS SCREEN -->
+  <div class="screen" id="screen-sos">
+    <div class="sos-hero">
+      <div class="sos-hero-label">Emergency phrase</div>
+      <div class="sos-phrase" id="sosPhrase">Loading…</div>
+      <button class="sos-speak-btn" id="sosSpeakBtn">🔊 Speak this out loud</button>
+    </div>
+
+    <div class="section-title">Call for help</div>
+    <div class="call-row">
+      <a class="call-btn" href="tel:112"><span class="num">112</span><span class="lbl">All Emergencies</span></a>
+      <a class="call-btn" href="tel:108"><span class="num">108</span><span class="lbl">Ambulance</span></a>
+    </div>
+
+    <div class="family-box">
+      <div class="section-title" style="margin:0;">Family / Employer Contact</div>
+      <input type="tel" id="familyNum" placeholder="Enter a phone number to save here">
+      <a class="family-call" id="familyCallBtn" href="#" style="display:none;">📞 Call saved contact</a>
+    </div>
+  </div>
+
+  <div class="navbar">
+    <button class="nav-btn active" data-screen="translate"><span class="icon">🗣️</span>Translate</button>
+    <button class="nav-btn" data-screen="phrases"><span class="icon">📋</span>Phrases</button>
+    <button class="nav-btn sos-nav" data-screen="sos"><span class="icon">🆘</span>SOS</button>
+  </div>
+</div>
+
+<script>
+/* ============ LANGUAGES ============ */
+const LANGS = [
+  {code:"hi-IN", name:"Hindi"},
+  {code:"en-IN", name:"English"},
+  {code:"ta-IN", name:"Tamil"},
+  {code:"te-IN", name:"Telugu"},
+  {code:"kn-IN", name:"Kannada"},
+  {code:"ml-IN", name:"Malayalam"},
+  {code:"bn-IN", name:"Bengali"},
+  {code:"mr-IN", name:"Marathi"},
+  {code:"gu-IN", name:"Gujarati"},
+  {code:"pa-IN", name:"Punjabi"},
+  {code:"or-IN", name:"Odia"}
+];
+
+let langA = "hi-IN"; // worker's language
+let langB = "ta-IN"; // local language
+
+const langAEl = document.getElementById("langA");
+const langBEl = document.getElementById("langB");
+LANGS.forEach(l=>{
+  langAEl.innerHTML += `<option value="${l.code}">${l.name}</option>`;
+  langBEl.innerHTML += `<option value="${l.code}">${l.name}</option>`;
+});
+langAEl.value = langA;
+langBEl.value = langB;
+langAEl.onchange = ()=>{ langA = langAEl.value; refreshHeaders(); phraseCache={}; renderPhrases(); loadSOSPhrase(); };
+langBEl.onchange = ()=>{ langB = langBEl.value; refreshHeaders(); phraseCache={}; renderPhrases(); loadSOSPhrase(); };
+
+document.getElementById("swapBtn").onclick = ()=>{
+  [langA, langB] = [langB, langA];
+  langAEl.value = langA; langBEl.value = langB;
+  refreshHeaders(); phraseCache={}; renderPhrases(); loadSOSPhrase();
+};
+
+function langName(code){ return LANGS.find(l=>l.code===code)?.name || code; }
+function refreshHeaders(){
+  document.getElementById("headA").textContent = "YOU SAID (" + langName(langA).toUpperCase() + ")";
+  document.getElementById("headB").querySelector("span").textContent = "TRANSLATION (" + langName(langB).toUpperCase() + ")";
+}
+refreshHeaders();
+
+/* ============ NAV ============ */
+document.querySelectorAll(".nav-btn").forEach(btn=>{
+  btn.onclick = ()=>{
+    document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("screen-"+btn.dataset.screen).classList.add("active");
+  };
+});
+
+/* ============ TRANSLATION ============
+   Tries two independent free translation services, in order, so if one
+   is blocked or rate-limited for a particular network or hosted origin,
+   the other still gets an answer through. */
+function isoOf(bcp47){ return bcp47.split("-")[0]; }
+
+async function translateViaGoogle(text, from, to){
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${from}&tl=${to}&dt=t&q=${encodeURIComponent(text)}`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("google status " + res.status);
+  const data = await res.json();
+  const out = data[0].map(seg=>seg[0]).join("").trim();
+  if(!out) throw new Error("google empty result");
+  return out;
+}
+
+async function translateViaMyMemory(text, from, to){
+  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("mymemory status " + res.status);
+  const data = await res.json();
+  const out = data && data.responseData && data.responseData.translatedText;
+  if(!out) throw new Error("mymemory empty result");
+  return out;
+}
+
+async function translateText(text, fromLangCode, toLangCode){
+  const from = isoOf(fromLangCode), to = isoOf(toLangCode);
+  try{
+    return await translateViaGoogle(text, from, to);
+  }catch(e1){
+    console.warn("Primary translator failed, trying backup:", e1);
+    try{
+      return await translateViaMyMemory(text, from, to);
+    }catch(e2){
+      console.error("Backup translator also failed:", e2);
+      return "(could not reach translator — check your internet connection)";
+    }
+  }
+}
+
+/* Translate a list of short phrases (runs the requests in parallel) */
+async function translateBatch(phrases, fromLangCode, toLangCode){
+  return Promise.all(phrases.map(p => translateText(p, fromLangCode, toLangCode)));
+}
+
+/* ============ TEXT TO SPEECH ============
+   Primary: fetch a real human-sounding cloud voice (same voice used on
+   Google Translate's own website) -- no phone settings or voice-pack
+   installation needed, just an internet connection.
+   Fallback: the phone's built-in voice, only if the cloud call fails
+   (e.g. no internet) so the app still says something. */
+
+let availableVoices = [];
+function loadVoices(){ availableVoices = window.speechSynthesis.getVoices(); }
+if("speechSynthesis" in window){
+  loadVoices();
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+}
+
+function pickVoice(langCode){
+  const iso = isoOf(langCode);
+  return availableVoices.find(v => v.lang.toLowerCase() === langCode.toLowerCase())
+      || availableVoices.find(v => v.lang.toLowerCase().startsWith(iso))
+      || null;
+}
+
+function speakWithDeviceVoice(text, langCode){
+  if(!("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  const voice = pickVoice(langCode);
+  if(voice){ u.voice = voice; u.lang = voice.lang; } else { u.lang = langCode; }
+  u.rate = 0.82;
+  window.speechSynthesis.speak(u);
+  statusPill.textContent = voice
+    ? ""
+    : "⚠ Using this phone's built-in voice — it may sound unclear for " + langName(langCode) + ".";
+}
+
+// Google's spoken-audio endpoint caps out around 200 characters per request,
+// so long phrases are split on word boundaries and played back to back.
+function splitForSpeech(text, maxLen){
+  const words = text.split(" ");
+  const chunks = [];
+  let cur = "";
+  words.forEach(w=>{
+    if((cur + " " + w).trim().length > maxLen){ chunks.push(cur.trim()); cur = w; }
+    else{ cur = (cur + " " + w).trim(); }
+  });
+  if(cur) chunks.push(cur.trim());
+  return chunks;
+}
+
+function playCloudChunks(chunks, iso, langCode, idx){
+  if(idx >= chunks.length) return;
+  const url = "https://translate.google.com/translate_tts?ie=UTF-8&tl=" + iso +
+              "&client=tw-ob&q=" + encodeURIComponent(chunks[idx]);
+  const audio = new Audio(url);
+  audio.onended = ()=> playCloudChunks(chunks, iso, langCode, idx + 1);
+  audio.onerror = ()=> speakWithDeviceVoice(chunks.slice(idx).join(" "), langCode);
+  audio.play().catch(()=> speakWithDeviceVoice(chunks.slice(idx).join(" "), langCode));
+}
+
+function speak(text, langCode){
+  statusPill.textContent = "";
+  const chunks = splitForSpeech(text, 180);
+  playCloudChunks(chunks, isoOf(langCode), langCode, 0);
+}
+
+/* ============ SPEECH TO TEXT ============
+   Two paths:
+   - NATIVE APP (packaged via Capacitor): uses Android's own speech
+     recognizer through the @capacitor-community/speech-recognition
+     plugin. This is required because Android's WebView (what a
+     packaged app runs in) does not support the browser's built-in
+     SpeechRecognition API at all.
+   - PLAIN WEBSITE (opened in Chrome): uses the browser's built-in
+     SpeechRecognition API directly, same as before. */
+const micBtn = document.getElementById("micBtn");
+const micLabel = document.getElementById("micLabel");
+const micSub = document.getElementById("micSub");
+const textA = document.getElementById("textA");
+const textB = document.getElementById("textB");
+const playB = document.getElementById("playB");
+const statusPill = document.getElementById("statusPill");
+
+const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+let listening = false;
+
+function setListeningUI(isListening){
+  listening = isListening;
+  micBtn.classList.toggle("listening", isListening);
+  micLabel.textContent = isListening ? "Listening…" : "Tap and speak";
+  micSub.textContent = isListening ? ("Speak now in " + langName(langA)) : "Speaks your language, hears the reply";
+}
+
+/* ---- Native app path (Android speech recognizer) ---- */
+async function startNativeListening(){
+  const SR = window.Capacitor.Plugins.SpeechRecognition;
+  try{
+    const perm = await SR.requestPermissions();
+    if(perm.speechRecognition !== "granted"){
+      statusPill.textContent = "Microphone permission is needed for voice input. Please allow it in phone Settings → Apps → Saathi → Permissions.";
+      return;
+    }
+    setListeningUI(true);
+    SR.addListener("partialResults", (data)=>{
+      if(data.matches && data.matches.length) textA.value = data.matches[0];
+    });
+    await SR.start({ language: langA, popup: false, partialResults: true });
+    setListeningUI(false);
+  }catch(e){
+    console.error(e);
+    setListeningUI(false);
+    statusPill.textContent = "Mic error — please try again.";
+  }
+}
+
+/* ---- Plain website path (browser Web Speech API) ---- */
+const BrowserSpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+if(!isNativeApp && BrowserSpeechRecognition){
+  recognition = new BrowserSpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.onstart = ()=> setListeningUI(true);
+  recognition.onerror = (e)=>{ statusPill.textContent = "Mic error: " + e.error + " — check microphone permission."; };
+  recognition.onend = ()=> setListeningUI(false);
+  recognition.onresult = (e)=>{ textA.value = e.results[0][0].transcript; };
+}else if(!isNativeApp){
+  micSub.textContent = "Voice input isn't supported in this browser — try Chrome on Android, or type instead.";
+}
+
+micBtn.onclick = ()=>{
+  if(isNativeApp){
+    if(listening) return; // native plugin auto-stops on silence
+    startNativeListening();
+  }else{
+    if(!recognition) return;
+    if(listening){ recognition.stop(); return; }
+    recognition.lang = langA;
+    try{ recognition.start(); }catch(e){ /* already started */ }
+  }
+};
+
+
+const translateBtn = document.getElementById("translateBtn");
+translateBtn.onclick = async ()=>{
+  const heard = textA.value.trim();
+  if(!heard) return;
+  textB.textContent = "Translating…";
+  textB.classList.add("empty");
+  playB.style.display = "none";
+
+  const translated = await translateText(heard, langA, langB);
+  textB.textContent = translated;
+  textB.classList.remove("empty");
+  playB.style.display = "inline-block";
+  speak(translated, langB);
+};
+
+playB.onclick = ()=>{
+  const t = textB.textContent;
+  if(t && !textB.classList.contains("empty")) speak(t, langB);
+};
+
+/* ============ PHRASEBOOK ============ */
+const PHRASES = [
+  "What is my daily wage?",
+  "When will I get paid?",
+  "I need a doctor, it is an emergency.",
+  "I am injured at work.",
+  "Please call the police.",
+  "I need to rest for a few minutes.",
+  "Where is the nearest hospital?",
+  "I did not receive my full payment.",
+  "Please give me my identity documents back.",
+  "I need clean drinking water.",
+  "Can I see my work contract?",
+  "I want to speak to my family."
+];
+
+let phraseCache = {}; // { "langA|langB": [translatedA...], [translatedB...] }
+const phraseListEl = document.getElementById("phraseList");
+
+async function renderPhrases(){
+  phraseListEl.innerHTML = `<div class="loading-note">Translating phrases…</div>`;
+  const key = langA + "|" + langB;
+  if(!phraseCache[key]){
+    const [aArr, bArr] = await Promise.all([
+      translateBatch(PHRASES, "en", langA),
+      translateBatch(PHRASES, "en", langB)
+    ]);
+    phraseCache[key] = {a:aArr, b:bArr};
+  }
+  const {a, b} = phraseCache[key];
+  phraseListEl.innerHTML = "";
+  PHRASES.forEach((en, i)=>{
+    const card = document.createElement("div");
+    card.className = "phrase-card";
+    card.innerHTML = `
+      <div class="phrase-en">${en}</div>
+      <div class="phrase-row">
+        <div style="flex:1">
+          <div class="phrase-local">${a[i]}</div>
+        </div>
+        <button class="phrase-speak" data-text="${encodeURIComponent(a[i])}" data-lang="${langA}">🔊</button>
+      </div>
+      <div class="phrase-row" style="margin-top:10px; border-top:2px dashed var(--border); padding-top:10px;">
+        <div style="flex:1">
+          <div class="phrase-local" style="color:var(--steel-light)">${b[i]}</div>
+        </div>
+        <button class="phrase-speak" data-text="${encodeURIComponent(b[i])}" data-lang="${langB}">🔊</button>
+      </div>
+    `;
+    phraseListEl.appendChild(card);
+  });
+  phraseListEl.querySelectorAll(".phrase-speak").forEach(btn=>{
+    btn.onclick = ()=> speak(decodeURIComponent(btn.dataset.text), btn.dataset.lang);
+  });
+}
+renderPhrases();
+
+/* ============ SOS ============ */
+const SOS_TEXT = "This is an emergency. I need help right now. Please call this number or contact my family.";
+const sosPhraseEl = document.getElementById("sosPhrase");
+const sosSpeakBtn = document.getElementById("sosSpeakBtn");
+let sosTranslated = "";
+
+async function loadSOSPhrase(){
+  sosPhraseEl.textContent = "Loading…";
+  sosTranslated = await translateText(SOS_TEXT, "en", langB);
+  sosPhraseEl.textContent = sosTranslated;
+}
+loadSOSPhrase();
+
+sosSpeakBtn.onclick = ()=> speak(sosTranslated || SOS_TEXT, langB);
+
+/* Family contact */
+const familyNum = document.getElementById("familyNum");
+const familyCallBtn = document.getElementById("familyCallBtn");
+familyNum.oninput = ()=>{
+  const v = familyNum.value.trim();
+  if(v){
+    familyCallBtn.style.display = "block";
+    familyCallBtn.href = "tel:" + v;
+  }else{
+    familyCallBtn.style.display = "none";
+  }
+};
+</script>
+</body>
+</html>
